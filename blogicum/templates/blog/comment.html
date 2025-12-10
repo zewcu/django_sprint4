@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load django_bootstrap5 %}
+
+{% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-6 p-5">
+      <div class="card">
+        <div class="card-header">
+          {% if 'delete' in request.path %}
+            Удаление комментария
+          {% else %}
+            Редактирование комментария
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            {% if 'delete' not in request.path %}
+              {% bootstrap_form form %}
+            {% else %}
+              <p>Вы уверены, что хотите удалить комментарий?</p>
+            {% endif %}
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+              <button type="submit" class="btn btn-primary">
+                {% if 'delete' in request.path %}
+                  Удалить
+                {% else %}
+                  Сохранить
+                {% endif %}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

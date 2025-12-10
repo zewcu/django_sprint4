@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}
+  Лента записей
+{% endblock %}
+{% block content %}
+<div class="container py-5">
+  {% for post in page_obj %}
+    <article class="mb-5">
+      {% if post.image %}
+        <img class="card-img my-2" src="{{ post.image.url }}" alt="{{ post.title }}">
+      {% endif %}
+      <h2>{{ post.title }}</h2>
+      <p>{{ post.text|truncatewords:20 }}</p>
+      <p>Комментарии ({{ post.comments.count }})</p>
+    </article>
+  {% endfor %}
+</div>
+{% endblock %}
