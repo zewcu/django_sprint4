@@ -24,7 +24,7 @@ class IndexView(ListView):
     model = Post
     template_name = 'blog/index.html'
     paginate_by = 10
-    context_object_name = 'page_obj'
+    context_object_name = 'post_list'
 
     def get_queryset(self):
         return Post.objects.select_related(
@@ -104,14 +104,16 @@ class PostDeleteView(LoginRequiredMixin, DeleteView):
 
 class CategoryPostView(ListView):
     template_name = 'blog/category.html'
-    context_object_name = 'page_obj'
+    context_object_name = 'post_list'
     paginate_by = 10
 
     def get_queryset(self):
         category_slug = self.kwargs['category_slug']
         self.category = get_object_or_404(
             Category, slug=category_slug, is_published=True)
-        return Post.objects.filter(
+        return Post.objects.select_related(
+            'author', 'location', 'category'
+        ).filter(
             category=self.category,
             is_published=True,
             pub_date__lte=timezone.now()

@@ -20,11 +20,6 @@ class Category(models.Model):
         default=True,
         help_text='Снимите галочку, чтобы скрыть публикацию.'
     )
-    is_published = models.BooleanField(
-        'Опубликовано',
-        default=True,
-        help_text='Снимите галочку, чтобы скрыть публикацию.'
-    )
     created_at = models.DateTimeField('Добавлено', auto_now_add=True)
 
     def __str__(self):
