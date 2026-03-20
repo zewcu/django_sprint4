@@ -13,11 +13,55 @@ from django.views.generic import (
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.urls import reverse_lazy, reverse
 from django.utils import timezone
+from django.db.models import Count
 from .models import Post, Category, Comment
-from .forms import CommentForm
+from .forms import CommentForm, PostForm
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserChangeForm
+
+
+def get_published_posts(queryset=None):
+    """
+    Фильтрует посты по критериям опубликованности
+    """
+    if queryset is None:
+        queryset = Post.objects.all()
+    return queryset.filter(
+        is_published=True,
+        category__is_published=True,
+        pub_date__lte=timezone.now()
+    )
+
+
+def get_posts_with_comments(queryset=None, filter_published=True):
+    """
+    Дополняет посты количеством комментариев и опционально фильтрует по опубликованности
+    """
+    if queryset is None:
+        queryset = Post.objects.all()
+    
+    queryset = queryset.select_related('author', 'location', 'category')
+    queryset = queryset.annotate(comment_count=Count('comments'))
+    
+    if filter_published:
+        queryset = get_published_posts(queryset)
+    
+    if Post._meta.ordering:
+        queryset = queryset.order_by(*Post._meta.ordering)
+    else:
+        queryset = queryset.order_by('-pub_date')
+    
+    return queryset
+
+
+def get_page_obj(request, queryset, per_page=10):
+    """
+    Возвращает объект страницы пагинатора для заданного queryset
+    """
+    paginator = Paginator(queryset, per_page)
+    page_number = request.GET.get('page')
+    return paginator.get_page(page_number)
 
 
 class IndexView(ListView):
@@ -27,13 +71,7 @@ class IndexView(ListView):
     context_object_name = 'post_list'
 
     def get_queryset(self):
-        return Post.objects.select_related(
-            'author', 'location', 'category'
-        ).filter(
-            is_published=True,
-            category__is_published=True,
-            pub_date__lte=timezone.now()
-        ).order_by('-pub_date')
+        return get_posts_with_comments(filter_published=True)
 
 
 def post_detail(request, id):
@@ -69,7 +107,7 @@ def category_posts(request, category_slug):
 class PostCreateView(LoginRequiredMixin, CreateView):
     model = Post
     template_name = 'blog/create.html'
-    fields = ('title', 'text', 'pub_date', 'category', 'location', 'image')
+    form_class = PostForm
 
     def form_valid(self, form):
         form.instance.author = self.request.user
@@ -80,7 +118,7 @@ class PostCreateView(LoginRequiredMixin, CreateView):
 class PostUpdateView(LoginRequiredMixin, UpdateView):
     model = Post
     template_name = 'blog/create.html'
-    fields = ('title', 'text', 'pub_date', 'category', 'location', 'image')
+    form_class = PostForm
     pk_url_kwarg = 'post_id'
 
     def dispatch(self, request, *args, **kwargs):
@@ -111,13 +149,8 @@ class CategoryPostView(ListView):
         category_slug = self.kwargs['category_slug']
         self.category = get_object_or_404(
             Category, slug=category_slug, is_published=True)
-        return Post.objects.select_related(
-            'author', 'location', 'category'
-        ).filter(
-            category=self.category,
-            is_published=True,
-            pub_date__lte=timezone.now()
-        ).order_by('-pub_date')
+        posts = self.category.post_set.all()
+        return get_posts_with_comments(posts, filter_published=True)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -141,14 +174,9 @@ class ProfileView(DetailView):
         context = super().get_context_data(**kwargs)
         profile_user = self.get_object()
         posts = profile_user.posts.all()
-        if self.request.user != profile_user:
-            posts = posts.filter(
-                is_published=True,
-                pub_date__lte=timezone.now()
-            )
-        paginator = Paginator(posts.order_by('-pub_date'), 10)
-        page_number = self.request.GET.get('page')
-        context['page_obj'] = paginator.get_page(page_number)
+        filter_published = self.request.user != profile_user
+        posts = get_posts_with_comments(posts, filter_published=filter_published)
+        context['page_obj'] = get_page_obj(self.request, posts, 10)
         return context
 
 
